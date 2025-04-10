@@ -1,0 +1,44 @@
+name: Weekly Leaderboard Update
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Run at midnight every Sunday
+  workflow_dispatch:      # Allow manual trigger
+
+jobs:
+  update-leaderboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Generate Leaderboard
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: contributors } = await github.rest.repos.listContributors({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            const leaderboard = contributors
+              .sort((a, b) => b.contributions - a.contributions)
+              .map((c, i) => `${i + 1}. [@${c.login}](${c.html_url}) - ${c.contributions} contributions`)
+              .join('\n');
+            
+            const content = `# HackerBoard Leaderboard\n\nUpdated: ${new Date().toISOString()}\n\n${leaderboard}`;
+            
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: 'leaderboard.md',
+              message: 'Update leaderboard',
+              content: Buffer.from(content).toString('base64'),
+              committer: {
+                name: 'GitHub Actions',
+                email: 'actions@github.com'
+              },
+              author: {
+                name: 'GitHub Actions',
+                email: 'actions@github.com'
+              }
+            }); 
